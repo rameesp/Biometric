@@ -4,10 +4,10 @@ import React
 
 @objc(BiometricModule)
 class BiometricModule: NSObject {
+  private let context = LAContext()
 
   @objc
   func authenticateWithBiometrics(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
-    let context = LAContext()
     var error: NSError?
 
     // Check if the device supports biometrics or passcode
@@ -20,24 +20,19 @@ class BiometricModule: NSObject {
           if success {
             resolve(true)
           } else if let laError = authenticationError as? LAError {
-            switch laError.code {
-            case .authenticationFailed:
-              reject("AUTH_FAILED", NSLocalizedString("Authentication failed. Please try again.", comment: ""), laError)
-            case .userCancel:
-              reject("USER_CANCEL", NSLocalizedString("Authentication was canceled by the user.", comment: ""), laError)
-            case .userFallback:
-              // The user selects to enter the passcode, system will handle it automatically
-              reject("USER_FALLBACK", NSLocalizedString("Fallback to passcode requested by the user.", comment: ""), laError)
-            case .systemCancel:
-              reject("SYSTEM_CANCEL", NSLocalizedString("Authentication was canceled by the system.", comment: ""), laError)
-            case .biometryNotAvailable:
-              reject("BIOMETRY_NOT_AVAILABLE", NSLocalizedString("Biometric authentication is not available on this device.", comment: ""), laError)
-            case .biometryNotEnrolled:
-              reject("BIOMETRY_NOT_ENROLLED", NSLocalizedString("No biometric authentication data is enrolled.", comment: ""), laError)
-            case .biometryLockout:
-              // If biometric is locked out, automatically show passcode screen
-              reject("BIOMETRY_LOCKOUT", NSLocalizedString("Biometric authentication is locked. Use passcode.", comment: ""), laError)
-            default:
+            let errorMap: [LAError.Code: (String, String)] = [
+              .authenticationFailed: ("AUTH_FAILED", NSLocalizedString("Authentication failed. Please try again.", comment: "")),
+              .userCancel: ("USER_CANCEL", NSLocalizedString("Authentication was canceled by the user.", comment: "")),
+              .userFallback: ("USER_FALLBACK", NSLocalizedString("Fallback to passcode requested by the user.", comment: "")),
+              .systemCancel: ("SYSTEM_CANCEL", NSLocalizedString("Authentication was canceled by the system.", comment: "")),
+              .biometryNotAvailable: ("BIOMETRY_NOT_AVAILABLE", NSLocalizedString("Biometric authentication is not available on this device.", comment: "")),
+              .biometryNotEnrolled: ("BIOMETRY_NOT_ENROLLED", NSLocalizedString("No biometric authentication data is enrolled.", comment: "")),
+              .biometryLockout: ("BIOMETRY_LOCKOUT", NSLocalizedString("Biometric authentication is locked. Use passcode.", comment: "")),
+            ]
+
+            if let (errorCode, errorMessage) = errorMap[laError.code] {
+              reject(errorCode, errorMessage, laError)
+            } else {
               reject("UNKNOWN_ERROR", NSLocalizedString("An unknown error occurred.", comment: ""), laError)
             }
           } else if let error = authenticationError {
